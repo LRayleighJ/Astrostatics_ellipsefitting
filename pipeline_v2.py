@@ -12,14 +12,16 @@ from lmfit import Minimizer, Parameters, report_fit, Parameter, minimize, fit_re
 import corner
 
 # NGC7597 349.62597 18.68925
+# ............................................parameters..............................................................
+band = "i"# ["g","i","r","u","z"] # use i band
+halfwidth_cut = 50 # half of fig size
+center_cut = (472, 1614) # center of galaxy
+sma_list = [3.,6.,10.,15.,23.,28.]
+num_drop_center_points = 10
 
-# decide which band to use and define the center and size you want to cut.
-bandlist = ["g","i","r","u","z"] # use i band
-halfwidth_cut = 50
-center_cut = (472, 1614)
-
+# ............................................pipeline................................................................
 # load data
-filename_image = "./data/correctframe/frame-i-006366-4-0132.fits"
+filename_image = './data/correctframe/frame-%s-006366-4-0132.fits'%(band,)
 hdul = fits.open(filename_image)
 fitdata = hdul[0].data
 
@@ -39,13 +41,13 @@ plt.close()
 #fitting surface luminosity using photutils
 ellipse = Ellipse(fitdata_cut)
 isolist = ellipse.fit_image()
-with open("isolist.to_table","w") as f:
+with open("isolist_to_table.txt","w") as f:
     print(isolist.to_table(), file=f)
 
 fig, ax = plt.subplots(figsize=(12, 8))
 ax1 = ax.imshow(fitdata_cut,cmap=cm.jet, norm=LogNorm())
 plt.colorbar(ax1)
-sma_list = [3.,6.,10.,15.,23.,28.]
+
 for sma in sma_list:
     iso = isolist.get_closest(sma)
     x, y, = iso.sampled_coordinates()
@@ -104,7 +106,7 @@ def sersic(r, I0, r0):
 params = Parameters()
 params['I0'] = Parameter(name='I0',value=300,min=0.01,max=1000)
 params['r0'] = Parameter(name = 'r0',value=10,min=0.000001,max=1)
-minner = Minimizer(fit_sersic, params, fcn_args=(isolist.sma[10:],isolist.intens[10:],isolist.int_err[10:]))
+minner = Minimizer(fit_sersic, params, fcn_args=(isolist.sma[num_drop_center_points:],isolist.intens[num_drop_center_points:],isolist.int_err[num_drop_center_points:]))
 fit_sersic_output = minner.minimize(method='leastsq')
 
 I0_fit = fit_sersic_output.params["I0"].value
@@ -113,7 +115,7 @@ r0_fit = fit_sersic_output.params["r0"].value
 print("Fitting result    I0:%.2f, r0:%.6f"%(I0_fit,r0_fit))
 
 fig,ax = plt.subplots(figsize=(6, 4))
-ax.plot(isolist.sma[10:],sersic(isolist.sma,I0_fit, r0_fit)[10:])
+ax.plot(isolist.sma[num_drop_center_points:],sersic(isolist.sma,I0_fit, r0_fit)[num_drop_center_points:])
 ax.errorbar(isolist.sma, isolist.intens, yerr=isolist.int_err, fmt='o', markersize=2)
 ax.set_xlabel('sma')
 ax.set_ylabel('luminosity')
@@ -172,4 +174,4 @@ for name in params.keys():
     fmt = ' {:8s}{:8.4f} {:8.4f} {:8.4f} {:8.4f} {:8.4f}'.format
     print(fmt(name, err_m2, err_m1, median, err_p1, err_p2))
 
-# FISHER matrix forecast
+# FISHER matrix forecast: Coming SOON
