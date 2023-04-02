@@ -11,13 +11,13 @@ import lmfit
 from lmfit import Minimizer, Parameters, report_fit, Parameter, minimize, fit_report ,conf_interval
 import corner
 
-# NGC7597 349.62597 18.68925
+# NGC7597 ra=349.62597 dec=18.68925
 # ............................................parameters..............................................................
 band = "i"# ["g","i","r","u","z"] # use i band
 halfwidth_cut = 50 # half of fig size
 center_cut = (472, 1614) # center of galaxy
-sma_list = [3.,6.,10.,15.,23.,28.]
-num_drop_center_points = 10
+sma_list = [3.,6.,10.,15.,23.,28.]# semimajor axis when plotting the fitting ellipse
+num_drop_center_points = 10 # number of center points dropping when fitting sersic function 
 
 # ............................................pipeline................................................................
 # load data
