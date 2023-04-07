@@ -1,7 +1,7 @@
 # Astrostatics_ellipsefitting
 NAOC astrostatics very_BIG_homework ex.2
 
-Just open pipeline_v2.py and HAVE FUN. tutorial.ipynb and pipeline.py are f*cking TRASH.  LRayleighJ 230402
+Add the code of Fisher Matrix Forecast. Just open pipeline_v2.py and HAVE FUN. About Fisher matrix, please check [Report of the DARK ENERGY TASK FORCE](https://arxiv.org/abs/astro-ph/0609591), Page 94. LRayleighJ 230407
 
 ## 目前的进度和预期需要完成的事情
 
@@ -24,5 +24,8 @@ Just open pipeline_v2.py and HAVE FUN. tutorial.ipynb and pipeline.py are f*ckin
 
 学长写的东西真好使（心虚
 ## 日志（迫真
+
+[OUTDATE]Just open pipeline_v2.py and HAVE FUN. tutorial.ipynb and pipeline.py are f*cking TRASH.  LRayleighJ 230402
+
 [OUTDATE] Just open tutorial.ipynb and HAVE FUN. LRayleighJ 230401
 
