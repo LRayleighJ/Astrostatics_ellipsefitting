@@ -18,7 +18,7 @@ band = "i"# ["g","i","r","u","z"] # use i band
 halfwidth_cut = 50 # half of fig size
 center_cut = (472, 1614) # center of galaxy
 sma_list = [3.,6.,10.,15.,23.,28.]# semimajor axis when plotting the fitting ellipse
-num_drop_center_points = 10 # number of center points dropping when fitting sersic function 
+num_drop_center_points = 15 # number of center points dropping when fitting sersic function 
 
 # ............................................pipeline................................................................
 # load data
