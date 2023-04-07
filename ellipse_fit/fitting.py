@@ -92,3 +92,53 @@ def draw_ellipse(ax, center, A, e, alpha):
     x_res = R*np.cos(theta_res) + e*A*np.cos(alpha)+center[0]
     y_res = R*np.sin(theta_res) + e*A*np.sin(alpha)+center[1]
     ax.plot(x_res, y_res, color="deepskyblue",lw=0.5)
+
+
+def plot_contour_pdf(X,Y,covmat):
+    det_cov = np.linalg.det(covmat)
+    Fishermat = np.linalg.inv(covmat)
+    c00 = Fishermat[0][0]
+    c01 = Fishermat[0][1]
+    c10 = Fishermat[1][0]
+    c11 = Fishermat[1][1]
+    def pdf_0(x,y):
+        return 1/(2*np.pi*np.sqrt(det_cov))*np.exp(-1/2*(c00*x**2+c01*x*y+c10*y*x+c11*y**2))
+    pdf_np = np.frompyfunc(pdf_0,2,1)
+    return pdf_np(X,Y).astype(np.float64)
+
+def plot_confidence_ellipse(prob=0.6526, covmat=None):
+    det_cov = np.linalg.det(covmat)
+    Fishermat = np.linalg.inv(covmat)
+    eigval,eigvec = np.linalg.eig(Fishermat)
+
+    ## find the  Alpha Quadrant eigvec
+    eigvec = eigvec.T
+    smaxisvec = None
+    for i in range(2):
+        vec_choose = eigvec[i]
+        if (vec_choose[0]>0)&(vec_choose[1]>0):
+            smaxisvec = vec_choose
+            break
+        elif (vec_choose[0]<0)&(vec_choose[1]<0):
+            smaxisvec = -vec_choose
+            break
+        else:
+            continue
+    smaval = eigval[i]
+    miaxisvec = eigvec[1-i]
+    miaxisvec = np.array([-np.abs(miaxisvec[0]),np.abs(miaxisvec[1])])
+    miaval = eigval[1-i]
+
+    prob_rate = np.sqrt(-2*np.log(1-prob))
+
+    A = prob_rate/np.sqrt(smaval)
+    B = prob_rate/np.sqrt(miaval)
+
+    incli = np.arcsin(smaxisvec[1]/np.sqrt(np.sum(smaxisvec**2)))
+
+    theta = np.linspace(0,2*np.pi,100)
+
+    x_list = A*np.cos(theta)*np.cos(incli)-B*np.sin(theta)*np.sin(incli)
+    y_list = A*np.cos(theta)*np.sin(incli)+B*np.sin(theta)*np.cos(incli)
+
+    return x_list,y_list

@@ -10,6 +10,7 @@ from photutils.isophote import EllipseGeometry
 import lmfit
 from lmfit import Minimizer, Parameters, report_fit, Parameter, minimize, fit_report ,conf_interval
 import corner
+from ellipse_fit import fitting as eft
 
 # NGC7597 ra=349.62597 dec=18.68925
 # ............................................parameters..............................................................
@@ -175,3 +176,57 @@ for name in params.keys():
     print(fmt(name, err_m2, err_m1, median, err_p1, err_p2))
 
 # FISHER matrix forecast: Coming SOON
+# using normalized parameters
+# I0_fit r0_fit
+I0_fit = res.params["I0"].value
+r0_fit = res.params["r0"].value
+
+sma_fit = isolist.sma[num_drop_center_points:]
+lumi_fit = isolist.intens[num_drop_center_points:]
+lumi_err_fit = isolist.int_err[num_drop_center_points:]
+
+# calculate Fisher Matrix
+pfpi = I0_fit*np.exp(-(sma_fit/r0_fit)**0.25)
+pfpr = I0_fit*np.exp(-(sma_fit/r0_fit)**0.25)*1/4*(sma_fit/r0_fit)**0.25
+
+Fii = np.sum(pfpi*pfpi/lumi_err_fit**2)
+Fir = np.sum(pfpi*pfpr/lumi_err_fit**2)
+Fri = np.sum(pfpr*pfpi/lumi_err_fit**2)
+Frr = np.sum(pfpr*pfpr/lumi_err_fit**2)
+
+Fisher_mat = np.array([[Fii,Fir],[Fri,Frr]])
+cov_mat = np.linalg.inv(Fisher_mat)
+
+print(cov_mat)
+print(Fisher_mat)
+eigval,eigvec = np.linalg.eig(Fisher_mat)
+print(eigval)
+print(eigvec)
+
+Inor_axis = np.linspace(-0.005,0.005,100)
+rnor_axis = np.linspace(-0.005,0.005,100)
+
+Inor_grid,rnor_grid = np.meshgrid(Inor_axis,rnor_axis)
+pdf_grid = eft.plot_contour_pdf(Inor_grid,rnor_grid,cov_mat)
+
+# confidence ellipse
+x_1sig,y_1sig = eft.plot_confidence_ellipse(prob=0.6526,covmat=cov_mat)
+x_2sig,y_2sig = eft.plot_confidence_ellipse(prob=0.9544,covmat=cov_mat)
+x_3sig,y_3sig = eft.plot_confidence_ellipse(prob=0.9974,covmat=cov_mat)
+
+#MCMC samples
+I0_sample_mcmc = res.flatchain["I0"].values
+r0_sample_mcmc = res.flatchain["r0"].values
+
+fig,ax = plt.subplots(figsize=(8,6))
+# ax1 = ax.contourf((Inor_grid+1)*I0_fit,(rnor_grid+1)*r0_fit,pdf_grid)
+ax.plot((x_1sig+1)*I0_fit,(y_1sig+1)*r0_fit,label="$1\sigma$ given by Fisher Matrix")
+ax.plot((x_2sig+1)*I0_fit,(y_2sig+1)*r0_fit,label="$2\sigma$ given by Fisher Matrix")
+ax.plot((x_3sig+1)*I0_fit,(y_3sig+1)*r0_fit,label="$3\sigma$ given by Fisher Matrix")
+ax.scatter(I0_sample_mcmc,r0_sample_mcmc,s=2,alpha=0.3,label="MCMC sampling")
+ax.set_xlabel('I0')
+ax.set_ylabel('sma')
+# plt.colorbar(ax1)
+ax.legend()
+plt.savefig("test_pdf_fisher.pdf")
+plt.close()
