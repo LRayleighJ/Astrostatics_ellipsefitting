@@ -142,3 +142,45 @@ def plot_confidence_ellipse(prob=0.6526, covmat=None):
     y_list = A*np.cos(theta)*np.sin(incli)+B*np.sin(theta)*np.cos(incli)
 
     return x_list,y_list
+
+
+def check_sample_distribution(x_coor, y_coor, mean, covmat):
+    det_cov = np.linalg.det(covmat)
+    Fishermat = np.linalg.inv(covmat)
+    eigval,eigvec = np.linalg.eig(Fishermat)
+    ## find the  Alpha Quadrant eigvec
+    eigvec = eigvec.T
+    smaxisvec = None
+    for i in range(2):
+        vec_choose = eigvec[i]
+        if (vec_choose[0]>0)&(vec_choose[1]>0):
+            smaxisvec = vec_choose
+            break
+        elif (vec_choose[0]<0)&(vec_choose[1]<0):
+            smaxisvec = -vec_choose
+            break
+        else:
+            continue
+    smaval = eigval[i]
+    miaxisvec = eigvec[1-i]
+    miaxisvec = np.array([-np.abs(miaxisvec[0]),np.abs(miaxisvec[1])])
+    miaval = eigval[1-i]
+
+    # prob, KS test
+    # normalization
+    x_nor = (x_coor-mean[0])/mean[0]
+    y_nor = (y_coor-mean[1])/mean[1]
+
+    A0 = 1/np.sqrt(smaval)
+    B0 = 1/np.sqrt(miaval)
+
+    sma_nor = smaxisvec[0]*x_nor+smaxisvec[1]*y_nor
+    mia_nor = miaxisvec[0]*x_nor+miaxisvec[1]*y_nor
+    
+    prob_rate_sample = np.sqrt(sma_nor**2/A0**2+mia_nor**2/B0**2)
+
+    prob_nor = 1-np.exp(-prob_rate_sample**2/2)
+
+    return prob_nor
+
+    # return x_list,y_list

@@ -230,3 +230,23 @@ ax.set_ylabel('sma')
 ax.legend()
 plt.savefig("test_pdf_fisher.pdf")
 plt.close()
+
+#KS test
+prob_nor = eft.check_sample_distribution(I0_sample_mcmc,r0_sample_mcmc,[I0_fit,r0_fit],cov_mat)
+
+prob_list = np.linspace(0.01,0.99,100)
+CDF_list = []
+for prob in prob_list:
+    CDF = np.sum(prob_nor<prob)/len(prob_nor)
+    CDF_list.append(CDF)
+
+fig,ax = plt.subplots(figsize=(6,6))
+# ax1 = ax.contourf((Inor_grid+1)*I0_fit,(rnor_grid+1)*r0_fit,pdf_grid)
+ax.plot(prob_list,CDF_list,label="CDF given by MCMC")
+ax.plot(prob_list,prob_list,ls="--",label="ideal CDF given by Fisher matrix")
+ax.set_xlabel('CDF(ideal)')
+ax.set_ylabel('CDF(MCMC)')
+# plt.colorbar(ax1)
+ax.legend()
+plt.savefig("test_fisher_CDF.pdf")
+plt.close()
