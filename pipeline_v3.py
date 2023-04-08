@@ -1,4 +1,6 @@
 import numpy as np
+from scipy.special import gamma
+from scipy.special import gammainc
 from astropy.io import fits
 import matplotlib.pyplot as plt
 from matplotlib import cm
@@ -12,13 +14,14 @@ from lmfit import Minimizer, Parameters, report_fit, Parameter, minimize, fit_re
 import corner
 from ellipse_fit import fitting as eft
 
+
 # NGC7597 ra=349.62597 dec=18.68925
 # ............................................parameters..............................................................
 band = "i"# ["g","i","r","u","z"] # use i band
 halfwidth_cut = 50 # half of fig size
 center_cut = (472, 1614) # center of galaxy
 sma_list = [3.,6.,10.,15.,23.,28.]# semimajor axis when plotting the fitting ellipse
-num_drop_center_points = 15 # number of center points dropping when fitting sersic function 
+num_drop_center_points = 5 # number of center points dropping when fitting sersic function 
 
 # ............................................pipeline................................................................
 # load data
@@ -36,7 +39,7 @@ flatfitdata = fitdata_cut.flatten()
 
 plt.figure()
 plt.hist(flatfitdata,bins=100,range=[0.,5.])
-plt.savefig("./figs/luminosity_distribution.pdf")
+plt.savefig("./figs/luminosity_distribution_modified_sersic.pdf")
 plt.close()
 
 #fitting surface luminosity using photutils
@@ -56,7 +59,7 @@ for sma in sma_list:
     #print('Closest SMA = {:f}'.format(iso.sma))
     # this method on an Isophote instance returns the (x, y) coordinates of
     # the sampled points in the image.
-plt.savefig('test_ellipse_profile.pdf')
+plt.savefig('test_ellipse_profile_modified_sersic.pdf')
 plt.close()
 
 fig,ax = plt.subplots(figsize=(12, 8))
@@ -65,7 +68,7 @@ ax.errorbar(isolist.sma, isolist.intens, yerr=isolist.int_err, fmt='o', markersi
 ax.set_xlabel('sma')
 ax.set_ylabel('luminosity')
 ax.set_title("brightness profile")
-plt.savefig("test_luminosity_profile.pdf")
+plt.savefig("test_luminosity_profile_modified_sersic.pdf")
 plt.close()
 
 # arguments of ellipse fitting 
@@ -90,50 +93,67 @@ ax1.errorbar(isolist.sma, isolist.y0, yerr=isolist.y0_err, fmt='o', markersize=4
 ax1.set_xlabel('Semimajor axis length')
 ax1.set_ylabel('center y coordinate/pix')
 
-plt.savefig("test_ellipse_args.pdf")
+plt.savefig("test_ellipse_args_modified_sersic.pdf")
 plt.close()
 
 # fitting 1D sersic
 def fit_sersic(params, r, lumi, error):
     v = params.valuesdict()
-    model = v['I0'] * np.exp(-(r/v['r0'])**0.25)
+    bn = gammaincinv(2. * v['n'], 0.5)
+    model = v['I0'] * np.exp(-bn*((r/v['r0'])**(1/v['n']) - 1 ))
     return (model-lumi)/error
 
 
-def sersic(r, I0, r0):
-    return I0*np.exp(-(r/r0)**0.25)
+def sersic(r, I0, r0, n):
+    bn = gammaincinv(2. * n , 0.5)
+    return I0*np.exp(-bn*((r/r0)**(1/n) - 1))
 
 
 params = Parameters()
-params['I0'] = Parameter(name='I0',value=0.5,min=0.01,max=1000)
-params['r0'] = Parameter(name = 'r0',value=30,min=0.000001,max=60)
+params['I0'] = Parameter(name='I0',value=300,min=0.01,max=1000)
+params['r0'] = Parameter(name = 'r0',value=10,min=0.000001,max=110)
+params['n'] = Parameter(name='n',value=4,min=0.5,max=5)
 minner = Minimizer(fit_sersic, params, fcn_args=(isolist.sma[num_drop_center_points:],isolist.intens[num_drop_center_points:],isolist.int_err[num_drop_center_points:]))
 fit_sersic_output = minner.minimize(method='leastsq')
 
 I0_fit = fit_sersic_output.params["I0"].value
 r0_fit = fit_sersic_output.params["r0"].value
+n_fit = fit_sersic_output.params["n"].value
 
-print("Fitting result    I0:%.2f, r0:%.6f"%(I0_fit,r0_fit))
+print("Fitting result    I0:%.2f, r0:%.6f, n:%.4f"%(I0_fit,r0_fit,n_fit))
 
 fig,ax = plt.subplots(figsize=(6, 4))
-ax.plot(isolist.sma[num_drop_center_points:],sersic(isolist.sma,I0_fit, r0_fit)[num_drop_center_points:])
+ax.plot(isolist.sma[num_drop_center_points:],sersic(isolist.sma,I0_fit, r0_fit, n_fit)[num_drop_center_points:])
 ax.errorbar(isolist.sma, isolist.intens, yerr=isolist.int_err, fmt='o', markersize=2)
 ax.set_xlabel('sma')
 ax.set_ylabel('luminosity')
 ax.set_title("brightness profile")
-plt.savefig("test_luminosity_fitting.pdf")
+plt.savefig("test_luminosity_fitting_modified_sersic.pdf")
 plt.close()
 
 # Uncertainty analysis of parameters
 ci = lmfit.conf_interval(minner, fit_sersic_output)
 lmfit.printfuncs.report_ci(ci)
 
-fig, ax = plt.subplots(figsize=(6,6))
-cx, cy, grid = lmfit.conf_interval2d(minner, fit_sersic_output, 'I0', 'r0', 30, 30)
-ctp0 = ax.contour(cx, cy, grid, np.linspace(0, 1, 11))
-ax.set_xlabel('I0')
-ax.set_ylabel('r0')
-plt.savefig("test_confidence_ellipse.pdf")
+fig, axes = plt.subplots(1, 3, figsize=(12,6))
+
+cx, cy, grid = lmfit.conf_interval2d(minner, fit_sersic_output, 'I0', 'r0', 50, 50)
+ctp0 = axes[0].contour(cx, cy, grid, np.linspace(0, 1, 11))
+axes[0].set_xlabel('I0')
+axes[0].set_ylabel('r0')
+
+cx, cy, grid = lmfit.conf_interval2d(minner, fit_sersic_output, 'I0', 'n', 30, 30)
+ctp1 = axes[1].contour(cx, cy, grid, np.linspace(0, 1, 11))
+axes[1].set_xlabel('I0')
+axes[1].set_ylabel('n')
+
+cx, cy, grid = lmfit.conf_interval2d(minner, fit_sersic_output, 'n', 'r0', 30, 30)
+ctp2 = axes[2].contour(cx, cy, grid,np.linspace(0, 1, 11))
+fig.colorbar(ctp2, ax=axes[2])
+axes[2].set_xlabel('n')
+axes[2].set_ylabel('r0')
+
+plt.savefig("test_confidence_ellipse_modified_sersic.pdf")
 plt.close()
 
 # MCMC
@@ -142,7 +162,7 @@ res = minner.minimize(method='emcee', burn=400,steps=1000, nwalkers=200, thin=20
 #plt.figure(figsize=(12, 8))
 emcee_plot = corner.corner(res.flatchain, labels=res.var_names,
 truths=list(res.params.valuesdict().values()))
-plt.savefig('test_mcmc_sampling.pdf')
+plt.savefig('test_mcmc_sampling_modified_sersic.pdf')
 plt.close()
 
 print('median of posterior probability distribution')
@@ -180,8 +200,12 @@ for name in params.keys():
 # I0_fit r0_fit
 I0_fit = res.params["I0"].value
 r0_fit = res.params["r0"].value
+n_fit = res.params["n"].value
 
-print("args given by emcee(I,r): ", I0_fit, r0_fit)
+
+print("args given by emcee(I,r,n): ", I0_fit, r0_fit, n_fit)
+
+bn = gammaincinv(2. * n_fit, 0.5)
 
 sma_fit = isolist.sma[num_drop_center_points:]
 lumi_fit = isolist.intens[num_drop_center_points:]
@@ -199,11 +223,7 @@ Frr = np.sum(pfpr*pfpr/lumi_err_fit**2)
 Fisher_mat = np.array([[Fii,Fir],[Fri,Frr]])
 cov_mat = np.linalg.inv(Fisher_mat)
 
-print(cov_mat)
-print(Fisher_mat)
 eigval,eigvec = np.linalg.eig(Fisher_mat)
-print(eigval)
-print(eigvec)
 
 Inor_axis = np.linspace(-0.005,0.005,100)
 rnor_axis = np.linspace(-0.005,0.005,100)
@@ -230,25 +250,25 @@ ax.set_xlabel('I0')
 ax.set_ylabel('sma')
 # plt.colorbar(ax1)
 ax.legend()
-plt.savefig("test_pdf_fisher.pdf")
+plt.savefig("test_pdf_fisher_modified_sersic.pdf")
 plt.close()
 
-#KS test
-prob_nor = eft.check_sample_distribution(I0_sample_mcmc,r0_sample_mcmc,[I0_fit,r0_fit],cov_mat)
+# #KS test
+# prob_nor = eft.check_sample_distribution(I0_sample_mcmc,r0_sample_mcmc,[I0_fit,r0_fit],cov_mat)
 
-prob_list = np.linspace(0.01,0.99,100)
-CDF_list = []
-for prob in prob_list:
-    CDF = np.sum(prob_nor<prob)/len(prob_nor)
-    CDF_list.append(CDF)
+# prob_list = np.linspace(0.01,0.99,100)
+# CDF_list = []
+# for prob in prob_list:
+#     CDF = np.sum(prob_nor<prob)/len(prob_nor)
+#     CDF_list.append(CDF)
 
-fig,ax = plt.subplots(figsize=(6,6))
-# ax1 = ax.contourf((Inor_grid+1)*I0_fit,(rnor_grid+1)*r0_fit,pdf_grid)
-ax.plot(prob_list,CDF_list,label="CDF given by MCMC")
-ax.plot(prob_list,prob_list,ls="--",label="ideal CDF given by Fisher matrix")
-ax.set_xlabel('CDF(ideal)')
-ax.set_ylabel('CDF(MCMC)')
-# plt.colorbar(ax1)
-ax.legend()
-plt.savefig("test_fisher_CDF.pdf")
-plt.close()
+# fig,ax = plt.subplots(figsize=(6,6))
+# # ax1 = ax.contourf((Inor_grid+1)*I0_fit,(rnor_grid+1)*r0_fit,pdf_grid)
+# ax.plot(prob_list,CDF_list,label="CDF given by MCMC")
+# ax.plot(prob_list,prob_list,ls="--",label="ideal CDF given by Fisher matrix")
+# ax.set_xlabel('CDF(ideal)')
+# ax.set_ylabel('CDF(MCMC)')
+# # plt.colorbar(ax1)
+# ax.legend()
+# plt.savefig("test_fisher_CDF_modified_sersic.pdf")
+# plt.close()
