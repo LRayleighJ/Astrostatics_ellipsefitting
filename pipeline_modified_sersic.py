@@ -95,36 +95,60 @@ plt.savefig("test_ellipse_args.pdf")
 plt.close()
 
 # fitting 1D sersic
+def sersic(r, I0, r0):
+    return I0*np.exp(-(r/r0)**0.25)
+
+
 def fit_sersic(params, r, lumi, error):
     v = params.valuesdict()
     model = v['I0'] * np.exp(-(r/v['r0'])**0.25)
     return (model-lumi)/error
 
 
-def sersic(r, I0, r0):
-    return I0*np.exp(-(r/r0)**0.25)
+def bn(n):
+    return 2*n-1/3+4/405/n+46/25515/n**2+131/1148175/n**3-2194697/30690717750/n**4
+
+
+def pbn(n):
+    return 2-4/405/n**2-2*46/25515/n**3-3*131/1148175/n**4+4*2194697/30690717750/n**5
+
+
+def modified_sersic(r,I0,r0,n):
+    return I0*np.exp(-bn(n)*((r/r0)**(1/n)-1))
+
+
+def fit_modified_sersic(params, r, lumi, error):
+    v = params.valuesdict()
+    model = modified_sersic(r,v["I0"],v["r0"],v["n"])
+    return (model-lumi)/error
 
 
 params = Parameters()
 params['I0'] = Parameter(name='I0',value=0.5,min=0.01,max=1000)
 params['r0'] = Parameter(name = 'r0',value=30,min=0.000001,max=60)
-minner = Minimizer(fit_sersic, params, fcn_args=(isolist.sma[num_drop_center_points:],isolist.intens[num_drop_center_points:],isolist.int_err[num_drop_center_points:]))
+params['n'] = Parameter(name = 'r0',value=4,min=0.000001,max=6)
+minner = Minimizer(fit_modified_sersic, params, fcn_args=(isolist.sma[num_drop_center_points:],isolist.intens[num_drop_center_points:],isolist.int_err[num_drop_center_points:]))
 fit_sersic_output = minner.minimize(method='leastsq')
 
 I0_fit = fit_sersic_output.params["I0"].value
 r0_fit = fit_sersic_output.params["r0"].value
+n_fit  = fit_sersic_output.params["n"].value
 
-print("Fitting result    I0:%.2f, r0:%.6f"%(I0_fit,r0_fit))
+print("Fitting result(leastsq)    I0:%.2f, r0:%.6f, n:%2f"%(I0_fit,r0_fit,n_fit))
 
+'''
 fig,ax = plt.subplots(figsize=(6, 4))
-ax.plot(isolist.sma[num_drop_center_points:],sersic(isolist.sma,I0_fit, r0_fit)[num_drop_center_points:])
+ax.plot(isolist.sma[num_drop_center_points:],modified_sersic(isolist.sma,I0_fit, r0_fit, n_fit)[num_drop_center_points:])
 ax.errorbar(isolist.sma, isolist.intens, yerr=isolist.int_err, fmt='o', markersize=2)
 ax.set_xlabel('sma')
 ax.set_ylabel('luminosity')
 ax.set_title("brightness profile")
 plt.savefig("test_luminosity_fitting.pdf")
 plt.close()
+'''
 
+# leastsq is not accurate
+'''
 # Uncertainty analysis of parameters
 ci = lmfit.conf_interval(minner, fit_sersic_output)
 lmfit.printfuncs.report_ci(ci)
@@ -136,9 +160,9 @@ ax.set_xlabel('I0')
 ax.set_ylabel('r0')
 plt.savefig("test_confidence_ellipse.pdf")
 plt.close()
-
+'''
 # MCMC
-res = minner.minimize(method='emcee', burn=400,steps=1000, nwalkers=200, thin=20, is_weighted=True)
+res = minner.minimize(method='emcee', burn=500,steps=1000, nwalkers=200, thin=20, is_weighted=True)
 
 #plt.figure(figsize=(12, 8))
 emcee_plot = corner.corner(res.flatchain, labels=res.var_names,
@@ -178,63 +202,112 @@ for name in params.keys():
 
 # FISHER matrix forecast: Coming SOON
 # using normalized parameters
-# I0_fit r0_fit
+# I0_fit r0_fit n_fit
 I0_fit = res.params["I0"].value
 r0_fit = res.params["r0"].value
+n_fit = res.params["n"].value
 
-print("args given by emcee(I,r): ", I0_fit, r0_fit)
+print("args given by emcee(I,r,n): ", I0_fit, r0_fit, n_fit)
 
 sma_fit = isolist.sma[num_drop_center_points:]
 lumi_fit = isolist.intens[num_drop_center_points:]
 lumi_err_fit = isolist.int_err[num_drop_center_points:]
 
 # calculate Fisher Matrix
-pfpi = I0_fit*np.exp(-(sma_fit/r0_fit)**0.25)
-pfpr = I0_fit*np.exp(-(sma_fit/r0_fit)**0.25)*1/4*(sma_fit/r0_fit)**0.25
+pfpi = I0_fit*np.exp(-bn(n_fit)*((sma_fit/r0_fit)**(1/n_fit)-1))
+pfpr = I0_fit*np.exp(-bn(n_fit)*((sma_fit/r0_fit)**(1/n_fit)-1))*bn(n_fit)*1/n_fit*sma_fit**(1/n_fit)/r0_fit**(1/n_fit+1)*r0_fit
+pfpn = I0_fit*np.exp(-bn(n_fit)*((sma_fit/r0_fit)**(1/n_fit)-1))*(-pbn(n_fit)*((sma_fit/r0_fit)**(1/n_fit)-1)+bn(n_fit)*1/n_fit**2*(sma_fit/r0_fit)**(1/n_fit)*np.log(sma_fit/r0_fit))*n_fit
 
-Fii = np.sum(pfpi*pfpi/lumi_err_fit**2)
-Fir = np.sum(pfpi*pfpr/lumi_err_fit**2)
-Fri = np.sum(pfpr*pfpi/lumi_err_fit**2)
-Frr = np.sum(pfpr*pfpr/lumi_err_fit**2)
+partial_list = np.array([pfpi,pfpr,pfpn])
 
-Fisher_mat = np.array([[Fii,Fir],[Fri,Frr]])
-cov_mat = np.linalg.inv(Fisher_mat)
+Fisher_mat = np.ones((3,3))
 
-print(cov_mat)
-print(Fisher_mat)
-eigval,eigvec = np.linalg.eig(Fisher_mat)
-print(eigval)
-print(eigvec)
+for j in range(3):
+    for k in range(3):
+        Fisher_mat[j][k] = np.sum(partial_list[j]*partial_list[k]/lumi_err_fit**2)
 
+cov_mat_total = np.linalg.inv(Fisher_mat)
+
+# MCMC sample
+I0_sample_mcmc = res.flatchain["I0"].values
+r0_sample_mcmc = res.flatchain["r0"].values
+n_sample_mcmc = res.flatchain["n"].values
+
+sample_mcmc_list = [I0_sample_mcmc,r0_sample_mcmc,n_sample_mcmc]
+
+'''
 Inor_axis = np.linspace(-0.005,0.005,100)
 rnor_axis = np.linspace(-0.005,0.005,100)
+nnor_axis = np.linspace(-0.005,0.005,100)
 
 Inor_grid,rnor_grid = np.meshgrid(Inor_axis,rnor_axis)
 pdf_grid = eft.plot_contour_pdf(Inor_grid,rnor_grid,cov_mat)
+'''
 
-# confidence ellipse
-x_1sig,y_1sig = eft.plot_confidence_ellipse(prob=0.6526,covmat=cov_mat)
-x_2sig,y_2sig = eft.plot_confidence_ellipse(prob=0.9544,covmat=cov_mat)
-x_3sig,y_3sig = eft.plot_confidence_ellipse(prob=0.9974,covmat=cov_mat)
+# 3 subplots
+label_list = ["I0","r0","n"]
+tvalue_list = [I0_fit, r0_fit, n_fit]
+args_index_list = [(0,1),(0,2),(1,2)] 
 
-#MCMC samples
-I0_sample_mcmc = res.flatchain["I0"].values
-r0_sample_mcmc = res.flatchain["r0"].values
+fig = plt.figure(figsize=(12,12))
+axes = [fig.add_subplot(221), fig.add_subplot(223), fig.add_subplot(224)]
 
-fig,ax = plt.subplots(figsize=(8,6))
-# ax1 = ax.contourf((Inor_grid+1)*I0_fit,(rnor_grid+1)*r0_fit,pdf_grid)
-ax.plot((x_1sig+1)*I0_fit,(y_1sig+1)*r0_fit,label="$1\sigma$ given by Fisher Matrix")
-ax.plot((x_2sig+1)*I0_fit,(y_2sig+1)*r0_fit,label="$2\sigma$ given by Fisher Matrix")
-ax.plot((x_3sig+1)*I0_fit,(y_3sig+1)*r0_fit,label="$3\sigma$ given by Fisher Matrix")
-ax.scatter(I0_sample_mcmc,r0_sample_mcmc,s=2,alpha=0.3,label="MCMC sampling")
-ax.set_xlabel('I0')
-ax.set_ylabel('sma')
-# plt.colorbar(ax1)
-ax.legend()
+
+for index_fig in range(3):
+    ax = axes[index_fig]
+    arg1_index, arg2_index = args_index_list[index_fig]
+    cov_mat = np.array([[cov_mat_total[arg1_index][arg1_index],cov_mat_total[arg1_index][arg2_index]],
+                        [cov_mat_total[arg2_index][arg1_index],cov_mat_total[arg2_index][arg2_index]]])
+
+    # confidence ellipse
+    x_1sig,y_1sig = eft.plot_confidence_ellipse(prob=0.6526,covmat=cov_mat)
+    x_2sig,y_2sig = eft.plot_confidence_ellipse(prob=0.9544,covmat=cov_mat)
+    x_3sig,y_3sig = eft.plot_confidence_ellipse(prob=0.9974,covmat=cov_mat)
+
+    
+
+    #MCMC samples
+    arg1_sample_mcmc = sample_mcmc_list[arg1_index]
+    arg2_sample_mcmc = sample_mcmc_list[arg2_index]
+
+    arg1_fit = tvalue_list[arg1_index]
+    arg2_fit = tvalue_list[arg2_index]
+
+    arg1label = label_list[arg1_index]
+    arg2label = label_list[arg2_index]
+
+    # ax1 = ax.contourf((Inor_grid+1)*I0_fit,(rnor_grid+1)*r0_fit,pdf_grid)
+    ax.plot((x_1sig+1)*arg1_fit,(y_1sig+1)*arg2_fit, c="red",    label="$1\sigma$ given by Fisher Matrix")
+    ax.plot((x_2sig+1)*arg1_fit,(y_2sig+1)*arg2_fit, c="orange", label="$2\sigma$ given by Fisher Matrix")
+    ax.plot((x_3sig+1)*arg1_fit,(y_3sig+1)*arg2_fit, c="green",  label="$3\sigma$ given by Fisher Matrix")
+    ax.scatter(arg1_sample_mcmc,arg2_sample_mcmc,s=2,alpha=0.3,label="MCMC sampling",c="blue")
+    ax.set_xlabel(arg1label)
+    ax.set_ylabel(arg2label)
+
+    # fig range
+    x_center = np.mean((x_3sig+1)*arg1_fit)
+    y_center = np.mean((y_3sig+1)*arg2_fit)
+    x_radi = np.max((x_3sig+1)*arg1_fit)-np.min((x_3sig+1)*arg1_fit)
+    y_radi = np.max((y_3sig+1)*arg2_fit)-np.min((y_3sig+1)*arg2_fit)
+
+    ax.set_xlim(x_center-0.75*x_radi,x_center+0.75*x_radi)
+    ax.set_ylim(y_center-0.75*y_radi,y_center+0.75*y_radi)
+
+    if index_fig == 2:
+        ax.legend()
+
+ax_curve = fig.add_subplot(222)
+ax_curve.plot(isolist.sma[num_drop_center_points:],modified_sersic(isolist.sma,I0_fit, r0_fit, n_fit)[num_drop_center_points:])
+ax_curve.errorbar(isolist.sma, isolist.intens, yerr=isolist.int_err, fmt='o', markersize=2)
+ax_curve.set_xlabel('sma')
+ax_curve.set_ylabel('luminosity')
+ax_curve.set_title("emcee, I0: %.4f, r0: %.2f, n: %.4f"%(I0_fit, r0_fit, n_fit, ))
+plt.suptitle(GALAXY_NAME+" Modified sersic = $I_0\exp[-b(n)((r/r_0)^{1/n}-1)]$")
 plt.savefig("test_pdf_fisher.pdf")
 plt.close()
 
 #KS test
+'''
 prob_nor = eft.check_sample_distribution(I0_sample_mcmc,r0_sample_mcmc,[I0_fit,r0_fit],cov_mat)
 
 prob_list = np.linspace(0.01,0.99,100)
@@ -251,6 +324,6 @@ ax.set_xlabel('CDF(ideal)')
 ax.set_ylabel('CDF(MCMC)')
 # plt.colorbar(ax1)
 ax.legend()
-plt.suptitle(GALAXY_NAME)
 plt.savefig("test_fisher_CDF.pdf")
 plt.close()
+'''

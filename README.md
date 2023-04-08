@@ -1,7 +1,7 @@
 # Astrostatics_ellipsefitting
 NAOC astrostatics very_BIG_homework ex.2
 
-Add the code of Fisher Matrix Forecast. Just open pipeline_v2.py and HAVE FUN. About Fisher matrix, please check [Report of the DARK ENERGY TASK FORCE](https://arxiv.org/abs/astro-ph/0609591), Page 94. LRayleighJ 230407
+Add the code of Fisher Matrix Forecast and modify the form of sersic profile. Just open pipeline_modified_sersic.py and HAVE FUN. About Fisher matrix, I add a quick guide. And please check [Report of the DARK ENERGY TASK FORCE](https://arxiv.org/abs/astro-ph/0609591), Page 94. LRayleighJ 230408
 
 ## 目前的进度和预期需要完成的事情
 
@@ -23,9 +23,11 @@ Add the code of Fisher Matrix Forecast. Just open pipeline_v2.py and HAVE FUN. A
 * MCMC验证置信椭圆的可靠性
 
 学长写的东西真好使（心虚
-## 日志（迫真
+## Develop Log
 
-[OUTDATE]Just open pipeline_v2.py and HAVE FUN. tutorial.ipynb and pipeline.py are f*cking TRASH.  LRayleighJ 230402
+[OUTDATE] Add the code of Fisher Matrix Forecast. Just open pipeline_v2.py and HAVE FUN. About Fisher matrix, please check [Report of the DARK ENERGY TASK FORCE](https://arxiv.org/abs/astro-ph/0609591), Page 94. LRayleighJ 230407
+
+[OUTDATE] Just open pipeline_v2.py and HAVE FUN. tutorial.ipynb and pipeline.py are f*cking TRASH.  LRayleighJ 230402
 
 [OUTDATE] Just open tutorial.ipynb and HAVE FUN. LRayleighJ 230401
 

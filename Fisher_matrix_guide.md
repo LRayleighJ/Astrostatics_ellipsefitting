@@ -18,4 +18,4 @@ $$ F_{jk} = \sum_i\frac{1}{\sigma_i^2}\frac{\partial f_i}{\partial \theta_j}\fra
 
 Fisher matrix的方便之处在于，根据多元正态分布的一般形式，
 $$\rho(x)\propto \exp(-\frac{1}{2}x^T\Sigma^{-1}x)=\exp(-\frac{1}{2}\Sigma^{-1}_{jk}x_jx_k)$$
-$\Sigma$是协方差矩阵。于是我们就可以看出，对Fisher矩阵求逆即可得到协方差矩阵。
+$\Sigma$是协方差矩阵。于是我们就可以看出，对Fisher矩阵求逆即可得到协方差矩阵。Fisher Matrix Forecast在计算观测对宇宙学参数的约束的时候非常常用。
